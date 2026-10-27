@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
@@ -6,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#080604">
 <title>VANTA STORE</title>
+
 <style>
 :root{--bg:#050403;--panel:#100d08;--line:#6f5120;--text:#f8f0df;--muted:#b9ad98;--gold:#e7b85c;--gold2:#fff0b0}
 *{box-sizing:border-box}
@@ -41,19 +41,24 @@ body{margin:0;background:radial-gradient(ellipse at 50% -10%,#39280e 0,#100b05 3
 .price{font-size:20px;font-weight:950;color:var(--gold2);white-space:nowrap}
 .buy{background:linear-gradient(120deg,#fff0b0,#c38c2e);border:1px solid #ffe4a0;color:#1c1104;border-radius:999px;padding:10px 13px;font-weight:900;cursor:pointer}
 .empty{padding:30px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:15px;grid-column:1/-1}
-.status{font-size:12px;color:var(--muted);margin:10px 0}
+.status{font-size:12px;color:var(--muted);margin:10px 0;overflow-wrap:anywhere}
 .notice{margin-top:22px;padding:13px 15px;border:1px solid #62491f;background:#1a1207;border-radius:5px 13px 5px 13px;color:#dfc995;font-size:12px;line-height:1.9}
 .footer{text-align:center;color:#8d806b;font-size:12px;padding:27px 0 12px;border-top:1px solid #6f512044;margin-top:20px}
 @media(max-width:760px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.filters{grid-template-columns:1fr}.card{padding:14px}.bottom{align-items:stretch;flex-direction:column}.buy{width:100%}}
 @media(max-width:430px){.wrap{padding:12px}.grid{grid-template-columns:1fr}.card{min-height:195px}.bottom{flex-direction:row;align-items:center}.buy{width:auto}.top{align-items:flex-start}.hero{padding:25px 18px}}
 </style>
 </head>
+
 <body>
 <main class="wrap">
+
 <header class="top">
   <div class="brand">
     <div class="logo">V</div>
-    <div><h1 id="storeName">VANTA STORE</h1><p>متجر الخدمات الرقمية</p></div>
+    <div>
+      <h1 id="storeName">VANTA STORE</h1>
+      <p>متجر الخدمات الرقمية</p>
+    </div>
   </div>
   <button class="btn" id="contactTop">تواصل معنا</button>
 </header>
@@ -62,7 +67,7 @@ body{margin:0;background:radial-gradient(ellipse at 50% -10%,#39280e 0,#100b05 3
   <div class="eyebrow">DIGITAL PRODUCTS • ONLINE STORE</div>
   <h2>خدماتك الرقمية<br><span>في مكان واحد</span></h2>
   <p>تصفح المنتجات والخدمات المتاحة، راجع السعر، وأرسل طلبك عبر واتساب.</p>
-  <button class="btn" onclick="document.getElementById('products').scrollIntoView({behavior:'smooth'})">تصفح المنتجات ←</button>
+  <button class="btn" id="browseProducts">تصفح المنتجات ←</button>
 </section>
 
 <div class="head" id="products">
@@ -83,102 +88,251 @@ body{margin:0;background:radial-gradient(ellipse at 50% -10%,#39280e 0,#100b05 3
 <section class="grid" id="grid"></section>
 
 <div class="notice">تأكيد توفر المنتجات وطريقة الدفع يتم عبر المتجر.</div>
-<footer class="footer">© <span id="year"></span> <span id="footerName">VANTA STORE</span></footer>
+
+<footer class="footer">
+  © <span id="year"></span>
+  <span id="footerName">VANTA STORE</span>
+</footer>
+
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="./config.js"></script>
+
 <script>
 (() => {
-const cfg=window.STORE_CONFIG||{};
-const ready=cfg.SUPABASE_URL&&cfg.SUPABASE_ANON_KEY&&!cfg.SUPABASE_URL.includes("PASTE_")&&!cfg.SUPABASE_ANON_KEY.includes("PASTE_");
-const $=id=>document.getElementById(id);
-let sb=null,items=[],settings={store_name:cfg.STORE_NAME||"VANTA STORE",whatsapp_number:cfg.WHATSAPP_NUMBER||""};
+  "use strict";
 
-const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const money=n=>Number(n||0).toLocaleString("ru-RU",{maximumFractionDigits:2})+" ₽";
+  const cfg = window.STORE_CONFIG || {};
+  const $ = id => document.getElementById(id);
 
-function wa(message){
-  let n=String(settings.whatsapp_number||"").replace(/\D/g,"");
-  if(!n){alert("رقم واتساب غير مضبوط. يرجى المحاولة لاحقًا.");return}
-  window.open("https://wa.me/"+n+"?text="+encodeURIComponent(message),"_blank","noopener");
-}
+  const ready =
+    typeof cfg.SUPABASE_URL === "string" &&
+    typeof cfg.SUPABASE_ANON_KEY === "string" &&
+    cfg.SUPABASE_URL.length > 0 &&
+    cfg.SUPABASE_ANON_KEY.length > 0 &&
+    !cfg.SUPABASE_URL.includes("PASTE_") &&
+    !cfg.SUPABASE_ANON_KEY.includes("PASTE_");
 
-function draw(){
-  let q=$("search").value.trim().toLocaleLowerCase("ar"),cat=$("filter").value;
-  let list=items.filter(p=>(cat==="all"||p.category===cat)&&(`${p.name} ${p.description||""}`).toLocaleLowerCase("ar").includes(q));
-  $("grid").innerHTML=list.length?list.map(p=>`
-    <article class="card">
-      <div class="flag">${esc(p.flag||"🛍️")}</div>
-      <div class="tag">${p.category==="numbers"?"أرقام افتراضية":"منتج آخر"}</div>
-      <h4>${esc(p.name)}</h4>
-      <p class="desc">${esc(p.description||"متاح للطلب عبر واتساب")}</p>
-      <div class="bottom">
-        <div class="price">${money(p.price)}</div>
-        <button class="buy" data-buy="${esc(p.id)}">اطلب الآن</button>
-      </div>
-    </article>`).join(""):`<div class="empty">لا توجد منتجات مطابقة للبحث.</div>`;
-}
+  let sb = null;
+  let items = [];
 
-async function init(){
-  $("year").textContent=new Date().getFullYear();
-  $("storeName").textContent=settings.store_name;
-  $("footerName").textContent=settings.store_name;
-  document.title=settings.store_name;
+  let settings = {
+    store_name: cfg.STORE_NAME || "VANTA STORE",
+    whatsapp_number: cfg.WHATSAPP_NUMBER || ""
+  };
 
-  if(!ready){
-    $("status").textContent="بيانات Supabase غير مضبوطة في config.js.";
-    return;
+  const esc = value =>
+    String(value ?? "").replace(/[&<>"']/g, char => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    }[char]));
+
+  const money = value =>
+    Number(value || 0).toLocaleString("ru-RU", {
+      maximumFractionDigits: 2
+    }) + " ₽";
+
+  function setStatus(message) {
+    const status = $("status");
+    if (status) status.textContent = message;
   }
 
-  sb=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);
+  function wa(message) {
+    const number = String(settings.whatsapp_number || "")
+      .replace(/\D/g, "");
 
-  const [pr,sr]=await Promise.all([
-    sb.from("store_products").select("id,name,flag,category,price,description").eq("active",true).order("created_at",{ascending:false}),
-    sb.from("store_settings").select("store_name,whatsapp_number").eq("id",1).maybeSingle()
-  ]);
+    if (!number) {
+      alert("رقم واتساب غير مضبوط. راجع إعدادات المتجر.");
+      return;
+    }
 
-  if(pr.error){
-    $("status").textContent="تعذر تحميل المنتجات. تأكد من إعدادات Supabase.";
-    console.error(pr.error);
-    return;
+    const url =
+      "https://wa.me/" + number +
+      "?text=" + encodeURIComponent(message);
+
+    window.open(url, "_blank", "noopener");
   }
 
-  items=pr.data||[];
+  function draw() {
+    const searchInput = $("search");
+    const filterInput = $("filter");
+    const grid = $("grid");
 
-  if(sr.data){
-    settings={...settings,...sr.data};
-    $("storeName").textContent=settings.store_name||"VANTA STORE";
-    $("footerName").textContent=settings.store_name||"VANTA STORE";
-    document.title=settings.store_name||"VANTA STORE";
+    if (!searchInput || !filterInput || !grid) return;
+
+    const query = searchInput.value
+      .trim()
+      .toLocaleLowerCase("ar");
+
+    const category = filterInput.value;
+
+    const list = items.filter(product => {
+      const matchesCategory =
+        category === "all" || product.category === category;
+
+      const searchableText =
+        `${product.name || ""} ${product.description || ""}`
+          .toLocaleLowerCase("ar");
+
+      return matchesCategory && searchableText.includes(query);
+    });
+
+    if (!list.length) {
+      grid.innerHTML =
+        '<div class="empty">لا توجد منتجات مطابقة للبحث.</div>';
+      return;
+    }
+
+    grid.innerHTML = list.map(product => `
+      <article class="card">
+        <div class="flag">${esc(product.flag || "🛍️")}</div>
+
+        <div class="tag">
+          ${product.category === "numbers"
+            ? "أرقام افتراضية"
+            : "منتج آخر"}
+        </div>
+
+        <h4>${esc(product.name)}</h4>
+
+        <p class="desc">
+          ${esc(product.description || "متاح للطلب عبر واتساب")}
+        </p>
+
+        <div class="bottom">
+          <div class="price">${money(product.price)}</div>
+          <button class="buy" data-buy="${esc(product.id)}">
+            اطلب الآن
+          </button>
+        </div>
+      </article>
+    `).join("");
   }
 
-  $("status").textContent=items.length?`عدد المنتجات المتاحة: ${items.length}`:"لا توجد منتجات منشورة حتى الآن. أضف المنتجات من لوحة الإدارة.";
-  draw();
-}
+  async function init() {
+    $("year").textContent = new Date().getFullYear();
 
-$("grid").addEventListener("click",e=>{
-  let b=e.target.closest("[data-buy]");
-  if(!b)return;
-  let p=items.find(x=>x.id===b.dataset.buy);
-  if (p) wa(` *╭─────── ⋆⋅☆⋅⋆ ───────*
+    $("storeName").textContent = settings.store_name;
+    $("footerName").textContent = settings.store_name;
+    document.title = settings.store_name;
+
+    if (!ready) {
+      setStatus("بيانات Supabase غير مضبوطة في config.js.");
+      return;
+    }
+
+    if (!window.supabase?.createClient) {
+      setStatus("تعذر تحميل مكتبة Supabase. تحقق من اتصال الإنترنت.");
+      return;
+    }
+
+    try {
+      sb = window.supabase.createClient(
+        cfg.SUPABASE_URL,
+        cfg.SUPABASE_ANON_KEY
+      );
+
+      const [productsResult, settingsResult] = await Promise.all([
+        sb.from("store_products")
+          .select("id,name,flag,category,price,description")
+          .eq("active", true)
+          .order("created_at", { ascending: false }),
+
+        sb.from("store_settings")
+          .select("store_name,whatsapp_number")
+          .eq("id", 1)
+          .maybeSingle()
+      ]);
+
+      if (productsResult.error) {
+        console.error("Products error:", productsResult.error);
+        setStatus(
+          "خطأ تحميل المنتجات: " + productsResult.error.message
+        );
+        return;
+      }
+
+      items = productsResult.data || [];
+
+      if (settingsResult.error) {
+        console.error("Settings error:", settingsResult.error);
+      }
+
+      if (settingsResult.data) {
+        settings = {
+          ...settings,
+          ...settingsResult.data
+        };
+      }
+
+      const storeName = settings.store_name || "VANTA STORE";
+
+      $("storeName").textContent = storeName;
+      $("footerName").textContent = storeName;
+      document.title = storeName;
+
+      setStatus(
+        items.length
+          ? `عدد المنتجات المتاحة: ${items.length}`
+          : "لا توجد منتجات منشورة. راجع حالة المنتجات في لوحة الإدارة."
+      );
+
+      draw();
+
+    } catch (error) {
+      console.error("Store initialization error:", error);
+
+      setStatus(
+        "حدث خطأ أثناء تشغيل المتجر: " +
+        (error.message || "خطأ غير معروف")
+      );
+    }
+  }
+
+  $("grid").addEventListener("click", event => {
+    const button = event.target.closest("[data-buy]");
+    if (!button) return;
+
+    const product = items.find(
+      item => String(item.id) === button.dataset.buy
+    );
+
+    if (!product) return;
+
+    const message = `*╭─────── ⋆⋅☆⋅⋆ ───────*
         *𝑯𝑰𝑪𝑨𝑹𝑶*
 *╰─────── ⋆⋅☆⋅⋆ ───────╯*
 
 *「 ✧ 」 𝐍𝐔𝐌𝐁𝐄𝐑*
-   *⤷ ${p.name}*
+   *⤷ ${product.name}*
 
 *「 ✧ 」 𝐏𝐑𝐈𝐂𝐄*
-   *⤷ ${money(p.price)}*
+   *⤷ ${money(product.price)}*
 
 *─────── 𓆩 ✦ 𓆪 ───────*
-      *𝑯𝑰𝑪𝑨𝑹𝑶 𝑺𝑻𝑶𝑹𝑬* `});
-});
+      *𝑯𝑰𝑪𝑨𝑹𝑶 𝑺𝑻𝑶𝑹𝑬*`;
 
-$("contactTop").addEventListener("click",()=>wa(`مرحبًا، أريد الاستفسار عن المنتجات في ${settings.store_name}.`));
-$("search").addEventListener("input",draw);
-$("filter").addEventListener("change",draw);
-init();
+    wa(message);
+  });
+
+  $("contactTop").addEventListener("click", () => {
+    wa(
+      `مرحبًا، أريد الاستفسار عن المنتجات في ${settings.store_name}.`
+    );
+  });
+
+  $("browseProducts").addEventListener("click", () => {
+    $("products").scrollIntoView({ behavior: "smooth" });
+  });
+
+  $("search").addEventListener("input", draw);
+  $("filter").addEventListener("change", draw);
+
+  init();
 })();
 </script>
 </body>
